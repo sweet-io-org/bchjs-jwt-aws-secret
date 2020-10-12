@@ -1,0 +1,24 @@
+{
+  "name": "bchjs-jwt-aws-secret",
+  "version": "1.0.0",
+  "description": "aws secret rotation lambda for bch-js jwt tokens",
+  "main": "handler.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sweet-io-org/bchjs-jwt-aws-secret.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sweet-io-org/bchjs-jwt-aws-secret/issues"
+  },
+  "homepage": "https://github.com/sweet-io-org/bchjs-jwt-aws-secret#readme",
+  "dependencies": {
+    "@psf/bch-js": "^3.7.1",
+    "aws-sdk": "^2.771.0",
+    "jwt-bch-lib": "^1.2.1"
+  }
+}

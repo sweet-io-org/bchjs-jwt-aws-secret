@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: bch-jwt-aws-secret
+    Description: BCH JSON Web Token with AWS Secret
+    Author: sweet.io
+    SpdxLicenseId: MIT
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    Labels: [serverless,lambda,nodejs,sam]
+    HomePageUrl: https://github.com/sweet-io-org/bchjs-jwt-aws-secret.git
+    SemanticVersion: 0.0.1
+    SourceCodeUrl: https://github.com/sweet-io-org/bchjs-jwt-aws-secret/tree/0.0.1
+
+Globals:
+  Function:
+    Runtime: nodejs12.x
+    Timeout: 6
+    MemorySize: 1024
+
+Parameters:
+  userName:
+    Type: String
+    Default: ''
+    Description: FullStack account user
+  userPassword:
+    Type: String
+    Default: ''
+    Description: FullStack account password
+  fullStackAuthUrl:
+    Type: String
+    Description: FullStack Authorization URL
+    Default:  https://auth.fullstack.cash
+  fullStackApiUrl:
+    Type: String
+    Description: FullStack API URL
+    Default: https://api.fullstack.cash
+  secretManagerEndpoint:
+    Type: String
+    Description: Sprecify public or private (VPC endpoint) url. See https://docs.aws.amazon.com/general/latest/gr/asm.html
+    Default: https://secretsmanager.us-east-1.amazonaws.com
+
+Resources:
+  BCHCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: BCH Credentials secret
+      Name: bch-credentials-secret
+      SecretString:
+        !Join
+        - ''
+        - - '{'
+          - 'username'
+          - ':'
+          - !Ref userName
+          - ','
+          - 'password'
+          - ':'
+          - !Ref userPassword
+          - '}'
+      Tags:
+        - Key: Name
+          Value: bch-credentials-secret
+
+  BCHSecretLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: "/aws/lambda/bchjs-jws-aws-secret-log"
+
+  IamRoleLambdaExecution:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName:
+            Fn::Join:
+              - "-"
+              - - bchjs-jws-aws-secret
+                - lambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:UpdateSecretVersionStage
+                  - secretsmanager:DescribeSecret
+                Resource:
+                  - Fn::Sub: arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:CreateLogGroup
+                Resource:
+                  - Fn::Sub: arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/bchjs-jws-aws-secret*:*
+              - Effect: Allow
+                Action:
+                  - logs:PutLogEvents
+                Resource:
+                  - Fn::Sub: arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/bchjs-jws-aws-secret*:*:*
+      Path: "/"
+      RoleName:
+        Fn::Join:
+          - "-"
+          - - bchjs-jws-aws-secret
+            - Ref: AWS::Region
+            - lambdaRole
+
+
+  BCHSecretLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      FunctionName: bchjs-jws-aws-secret
+      Handler: handler.lambda_handler
+      Environment:
+        Variables:
+          FULLSTACK_AUTH_URL: !Ref fullStackAuthUrl
+          FULLSTACK_API_URL: !Ref fullStackApiUrl
+          SECRETS_MANAGER_ENDPOINT: !Ref secretManagerEndpoint
+          BCH_JS_CREDENTIALS_ARN: !Ref BCHCredentialsSecret
+      Role:
+        Fn::GetAtt:
+          - IamRoleLambdaExecution
+          - Arn
+    DependsOn: BCHCredentialsSecret
+
+
+  BCHSecretLambdaVersion:
+    Type: AWS::Lambda::Version
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName:
+        Ref: BCHSecretLambdaFunction
+
+
+Outputs:
+  RotateSecretLambdaFunction:
+    Description: "Rotate Secret Lambda Function Name"
+    Value: !Ref BCHSecretLambdaFunction
